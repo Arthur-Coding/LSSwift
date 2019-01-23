@@ -7,131 +7,202 @@
 //
 
 import Foundation
-
-public typealias LSSwiftModuleAction = (AnyObject)->Void
-
-// MARK: - 本地组件调用
+import UIKit
 
 public extension LSSwift {
     
-    static private let modulesKey = UnsafeRawPointer.init(bitPattern: "modules".hashValue)
-    
-    private var modules:Dictionary<String, Any> {
-        set (newModules) {
-            objc_setAssociatedObject(self, LSSwift.modulesKey!, newModules, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-        }
-        get {
-            if let routerModules = objc_getAssociatedObject(self, LSSwift.modulesKey!) as? Dictionary<String, Any> {
-                return routerModules
-            }
-            return [:]
-        }
+    public var module: LSModule<Object> {
+        return LSModule(object)
     }
     
-    /// 本地组件调用
-    ///
-    /// - Parameters:
-    ///   - objectClass: 组件类名
-    ///   - actionName: 待执行方法名，组件的方法名前必须添加前缀@objc
-    ///   - params: 待执行方法的参数
-    ///   - perform: 找到组件后下一步调用处理，如push、present组件等
-    public class func openModule(objectClass: String, actionName: String?, params: Any?, perform: LSSwiftModuleAction?)
-    {
-        var object:AnyObject?
-        
-        if initialization().modules.keys.contains(objectClass) {
-            object = initialization().modules[objectClass] as AnyObject
-        }else {
-            // 获取命名空间
-            var clsName:String = Bundle.main.infoDictionary!["CFBundleExecutable"] as! String
-            // 若命名空间包含"-"时，系统会自动替换为"_"，故需将"-"替换为"_"才能与系统验证时一致
-            clsName = clsName.replacingOccurrences(of: "-", with: "_")
-            if NSClassFromString(clsName+"."+objectClass) != nil {
-                let module = NSClassFromString(clsName+"."+objectClass) as! NSObject.Type
-                object = module.init()
-                initialization().modules[objectClass] = object;
-            }else {
-                #if DEBUG
-                print("Undiscovered component!")
-                #endif
-            }
-        }
-        
-        if perform != nil {
-            perform!(object!)
-        }
-        
-        if actionName != nil {
-            let action = Selector(actionName!)
-            
-            if  object!.responds(to: action) {
-                let result:Unmanaged<AnyObject>! = object!.perform(action, with: params)
-                if result != nil {
-                    #if DEBUG
-                    print("Execute successfully!")
-                    #endif
-                }
-            }else {
-                releaseModule(objectClass: objectClass)
-                #if DEBUG
-                print("Undiscovered action!")
-                #endif
-            }
-        }
-    }
-    
-    /// 释放组件
-    ///
-    /// - Parameter objectClass: 组件类名
-    /// - Returns: YES or NO
-    @discardableResult
-    public class func releaseModule(objectClass: String) -> Bool
-    {
-        if initialization().modules.keys.contains(objectClass) {
-            initialization().modules.removeValue(forKey: objectClass)
-            return true;
-        }
-        return false;
-    }
-    
-    /// 释放所有组件
-    public class func releaseAllModules()
-    {
-        initialization().modules.removeAll()
+    static var module: LSModule<Object>.Type {
+        return LSModule<Object>.self
     }
     
 }
 
-// MARK: - 组件远程调用
-
-public extension LSSwift {
+public struct LSModule<Moduler> {
     
-    /// 远程App调用本地组件
-    ///
-    /// - Parameters:
-    ///   - url: 格式：scheme://[target]/[actionName]?[params]
-    ///          例如：app://targetA/actionB?id=1234&key=4567
-    ///   - completion: 完成回调
-    public class func performAction(url: URL, completion: LSSwiftModuleAction?)
-    {
-        // 解析url中传递的参数
-        var params:Dictionary<String, Any> = [:]
-        for param in url.query!.components(separatedBy:"&") {
-            let elts = param.components(separatedBy:"=")
-            if elts.count >= 2 {
-                params[elts.first!] = elts.last!
+    let moduler: Moduler
+
+    /// 模块名
+    var moduleName = "" {
+        didSet {
+            if !modules.keys.contains(moduleName) {
+                if NSClassFromString(moduleName) != nil {
+                    let object = (NSClassFromString(moduleName) as! NSObject.Type).init()
+                    modules[moduleName] = object
+                }
             }
         }
-        
-        // 考虑到安全性，防止黑客通过远程方式调用本地模块
-        // 当前要求本地组件的actionName必须包含前缀"action_",所以远程调用的action就不能包含action_前缀
-        let actionName = url.path.replacingOccurrences(of: "/", with: "")
-        if actionName.hasPrefix("action_") {
-            return;
+    }
+    
+    fileprivate init(_ moduler: Moduler)
+    {
+        self.moduler = moduler
+    }
+    
+    public func configModule(for cls: AnyClass) -> LSModule
+    {
+        var lsmoudle = self
+        lsmoudle.moduleName = NSStringFromClass(cls)
+        return lsmoudle
+    }
+    
+}
+
+private var modules = [String: AnyObject]() {
+    didSet {
+        if moduleAction != nil {
+            moduleAction!()
         }
-        
-        // 如果需要拓展更复杂的url，可以在这个方法调用之前加入完整的路由逻辑
-        openModule(objectClass: url.host!, actionName: "action_"+actionName, params: params, perform: completion)
+    }
+}
+
+private var moduleAction: (()->Void)?
+
+public extension LSModule where Moduler: AnyObject {
+    
+    /// 模块
+    ///
+    /// - Parameter next: 下一步处理
+    func getModules(next: (([String: AnyObject])->Void)?)
+    {
+        moduleAction = {
+            if next != nil {
+                next!(modules)
+            }
+        }
+    }
+    
+    /// 访问模块
+    ///
+    /// - Parameters:
+    ///   - action: 打开方法
+    ///   - method: 打开后执行方法
+    ///   - params: 打开后执行方法的参数
+    @discardableResult
+    public func open(by action: (AnyObject)->Void) -> LSModule
+    {
+        if modules.keys.contains(moduleName) {
+            let module = modules[moduleName]
+            action(module!)
+        }
+        return self
+    }
+    
+    /// 访问模块完成后模块执行操作
+    ///
+    /// - Parameters:
+    ///   - method: 模块方法
+    ///   - params: 模块方法参数
+    public func completed(perform sel: Selector?, _ params: Any?)
+    {
+        if modules.keys.contains(moduleName) {
+            let module = modules[moduleName]
+            if sel != nil {
+                if module!.responds(to: sel!) {
+                    var result:Unmanaged<AnyObject>?
+                    if params == nil {
+                        result = module!.perform(sel!)
+                    }else {
+                        result = module!.perform(sel!, with: params!)
+                    }
+                    if result != nil {
+                        #if DEBUG
+                        print("Execute successfully!")
+                        #endif
+                    }
+                }else {
+                    release()
+                    #if DEBUG
+                    print("Undiscovered action!")
+                    #endif
+                }
+            }
+        }
+    }
+
+    /// 释放模块
+    ///
+    /// - Returns: true or false
+    @discardableResult
+    public func release() -> Bool
+    {
+        if modules.keys.contains(NSStringFromClass(Moduler.self)) {
+            modules.removeValue(forKey: NSStringFromClass(Moduler.self))
+            return true;
+        }
+        return false;
+    }
+
+    /// 释放所有模块
+    public func clearUp()
+    {
+        modules.removeAll()
+    }
+
+}
+
+public extension LSModule where Moduler: UIViewController {
+    
+    @discardableResult
+    public func push() -> LSModule
+    {
+        return open { (_ module) in
+            if module is UIViewController {
+                let vc = module as! UIViewController
+                vc.hidesBottomBarWhenPushed = true
+                moduler.navigationController?.pushViewController(vc, animated: true)
+            }
+        }
+    }
+    
+    @discardableResult
+    public func present(_ presentationStyle: UIModalPresentationStyle? = nil, _ transitionStyle: UIModalTransitionStyle? = nil, _ completion: (()->Void)? = nil) -> LSModule
+    {
+        return open { (_ module) in
+            if module is UIViewController  {
+                let vc = module as! UIViewController
+                if presentationStyle != nil {
+                    vc.modalPresentationStyle = presentationStyle!
+                }
+                if transitionStyle != nil {
+                    vc.modalTransitionStyle = transitionStyle!
+                }
+                moduler.present(vc, animated: true, completion: completion)
+            }
+        }
+    }
+    
+}
+
+public extension LSModule where Moduler: UIView {
+    
+    @discardableResult
+    public func addSubView() -> LSModule
+    {
+        return open(by: { (_ module) in
+            if module is UIView {
+                let view = module as! UIView
+                moduler.addSubview(view)
+            }
+        })
+    }
+    
+}
+
+public extension LSModule where Moduler: CALayer {
+    
+    @discardableResult
+    public func addSubLayer() -> LSModule
+    {
+        return open(by: { (_ module) in
+            if module is CALayer {
+                let layer = module as! CALayer
+                moduler.addSublayer(layer)
+            }
+        })
     }
     
 }
