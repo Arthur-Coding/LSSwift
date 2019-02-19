@@ -1,7 +1,7 @@
 Pod::Spec.new do |s|
 
     s.name         = "LSSwift"
-    s.version      = "1.1"
+    s.version      = "1.1.1"
     s.summary      = "LSSwift"
     s.description  = "LSSwift"
 

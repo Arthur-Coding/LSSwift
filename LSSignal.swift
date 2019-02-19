@@ -37,7 +37,7 @@ public struct LSSignal<Signaler> {
         self.signaler = signaler
     }
     
-    public func cnfigSignal(for tag: String) -> LSSignal
+    public func configSignal(for tag: String) -> LSSignal
     {
         var lssignal = self
         lssignal.signalTag = tag
