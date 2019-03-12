@@ -24,7 +24,7 @@ public extension LSSwift {
 public struct LSModule<Moduler> {
     
     let moduler: Moduler
-
+    
     /// 模块名
     var moduleName = "" {
         didSet {
@@ -85,7 +85,7 @@ public extension LSModule where Moduler: AnyObject {
         if modules.keys.contains(moduleName) {
             let module = modules[moduleName]
             if method != nil {
-               method!(module!)
+                method!(module!)
             }
         }
         return self
@@ -122,7 +122,7 @@ public extension LSModule where Moduler: AnyObject {
             }
         }
     }
-
+    
     /// 释放模块
     ///
     /// - Returns: true or false
@@ -135,13 +135,13 @@ public extension LSModule where Moduler: AnyObject {
         }
         return false;
     }
-
+    
     /// 释放所有模块
     public func clearUp()
     {
         modules.removeAll()
     }
-
+    
 }
 
 public extension LSModule where Moduler: UIViewController {
@@ -206,3 +206,4 @@ public extension LSModule where Moduler: CALayer {
     }
     
 }
+
