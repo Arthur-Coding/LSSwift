@@ -153,7 +153,7 @@ public extension LSModule where Moduler: UIViewController {
             if module is UIViewController {
                 let vc = module as! UIViewController
                 vc.hidesBottomBarWhenPushed = true
-                moduler.navigationController?.pushViewController(vc, animated: true)
+                self.moduler.navigationController?.pushViewController(vc, animated: true)
             }
         }
     }
@@ -170,7 +170,7 @@ public extension LSModule where Moduler: UIViewController {
                 if transitionStyle != nil {
                     vc.modalTransitionStyle = transitionStyle!
                 }
-                moduler.present(vc, animated: true, completion: completion)
+                self.moduler.present(vc, animated: true, completion: completion)
             }
         }
     }
@@ -185,7 +185,7 @@ public extension LSModule where Moduler: UIView {
         return open(by: { (_ module) in
             if module is UIView {
                 let view = module as! UIView
-                moduler.addSubview(view)
+                self.moduler.addSubview(view)
             }
         })
     }
@@ -200,7 +200,7 @@ public extension LSModule where Moduler: CALayer {
         return open(by: { (_ module) in
             if module is CALayer {
                 let layer = module as! CALayer
-                moduler.addSublayer(layer)
+                self.moduler.addSublayer(layer)
             }
         })
     }
