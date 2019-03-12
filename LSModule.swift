@@ -63,10 +63,10 @@ private var moduleAction: (()->Void)?
 
 public extension LSModule where Moduler: AnyObject {
     
-    /// 模块
+    /// 所有模块
     ///
     /// - Parameter next: 下一步处理
-    func getModules(next: (([String: AnyObject])->Void)?)
+    func getModules(_ next: (([String: AnyObject])->Void)?)
     {
         moduleAction = {
             if next != nil {
@@ -78,15 +78,15 @@ public extension LSModule where Moduler: AnyObject {
     /// 访问模块
     ///
     /// - Parameters:
-    ///   - action: 打开方法
-    ///   - method: 打开后执行方法
-    ///   - params: 打开后执行方法的参数
+    ///   - method: 打开方式
     @discardableResult
-    public func open(by action: (AnyObject)->Void) -> LSModule
+    public func open(by method: ((AnyObject)->Void)?) -> LSModule
     {
         if modules.keys.contains(moduleName) {
             let module = modules[moduleName]
-            action(module!)
+            if method != nil {
+               method!(module!)
+            }
         }
         return self
     }
