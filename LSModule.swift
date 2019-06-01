@@ -23,10 +23,10 @@ public extension LSSwift {
 
 public struct LSModule<Moduler> {
     
-    let moduler: Moduler
+    public let moduler: Moduler
     
     /// 模块名
-    var moduleName = "" {
+    public var moduleName = "" {
         didSet {
             if !modules.keys.contains(moduleName) {
                 if NSClassFromString(moduleName) != nil {
@@ -66,7 +66,7 @@ public extension LSModule where Moduler: AnyObject {
     /// 所有模块
     ///
     /// - Parameter next: 下一步处理
-    func getModules(_ next: (([String: AnyObject])->Void)?)
+    public func getModules(_ next: (([String: AnyObject])->Void)?)
     {
         moduleAction = {
             if next != nil {

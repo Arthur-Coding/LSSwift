@@ -22,10 +22,10 @@ public extension LSSwift {
 
 public struct LSSignal<Signaler> {
     
-    let signaler: Signaler
+    public let signaler: Signaler
     
     /// 信号标识
-    var signalTag = "" {
+    public var signalTag = "" {
         didSet {
             let signal = signals.keys.contains(signalTag) ? signals[signalTag] : LSSignalProvider.init()
             signals[signalTag] = signal
@@ -58,15 +58,15 @@ public struct LSSignalProvider {
     
     public struct Sender {
         
-        var target: AnyObject // 信号对象
-        var information: Any? // 信号信息
+        public var target: AnyObject // 信号对象
+        public var information: Any? // 信号信息
         
     }
     
     public struct Receiver {
         
-        var target: AnyObject // 信号对象
-        var action: ((LSSignalProvider, Any?) -> Void)?
+        public var target: AnyObject // 信号对象
+        public var action: ((LSSignalProvider, Any?) -> Void)?
         
     }
     
@@ -87,7 +87,7 @@ extension LSSignal where Signaler: AnyObject {
     /// 信号
     ///
     /// - Parameter next: 下一步处理
-    func getSignals(_ next: (([String: LSSignalProvider])->Void)?)
+    public func getSignals(_ next: (([String: LSSignalProvider])->Void)?)
     {
         signalAction = {
             if next != nil {
@@ -136,7 +136,8 @@ extension LSSignal where Signaler: AnyObject {
     ///
     /// - Parameters:
     ///   - next: 绑定接收信息处理
-    public func binding(_ next: ((LSSignalProvider, Any?) -> Void)?)
+    ///   - executeImmediately: 是否立即执行一次
+    public func binding(_ next: ((LSSignalProvider, Any?) -> Void)?, _ executeImmediately: Bool = false)
     {
         if !signals.keys.contains(signalTag) {
             return
@@ -144,18 +145,16 @@ extension LSSignal where Signaler: AnyObject {
         
         var signal = signals[signalTag]
         var receivers = signal?.receivers ?? [LSSignalProvider.Receiver]()
-        if receivers.count == 0 {
+        if receivers.count == 0 || !receivers.last!.target.isEqual(Signaler.self) {
             receivers.append(LSSignalProvider.Receiver.init(target: signaler, action: next))
-        }else {
-            for (idx, receiver) in receivers.enumerated() {
-                if idx == receivers.count - 1 && !receiver.target.isEqual(Signaler.self) {
-                    receivers.append(LSSignalProvider.Receiver.init(target: signaler, action: next))
-                    break
-                }
-            }
         }
+        
         signal?.receivers = receivers
         signals[signalTag] = signal
+        
+        if executeImmediately && next != nil {
+            next!(signal!, signal?.sender?.information)
+        }
     }
     
 }
